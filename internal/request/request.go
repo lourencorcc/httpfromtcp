@@ -118,16 +118,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 }
 
 func parseRequestLine(request []byte) (*RequestLine, int, error) {
-	//lines := strings.Split(string(request), "\r\n")
 	idx := bytes.Index(request, []byte("\r\n"))
-	/* if len(lines) == 1 {
-		fmt.Println("Not enough!")
-		// Can't find the \r\n
-		return RequestLine{}, 0, nil
-	}*/
 
 	if idx == -1 {
-		fmt.Println("Not enough!")
 		// Can't find the \r\n
 		return nil, 0, nil
 	}
