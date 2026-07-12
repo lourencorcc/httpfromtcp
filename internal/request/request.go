@@ -15,7 +15,7 @@ var ERROR_INVALID_METHOD = fmt.Errorf("request method is invalid")
 var ERROR_MALFORMED_REQUEST = fmt.Errorf("invalid number of parts in the request.")
 var ERROR_PARSED_REQUEST = fmt.Errorf("the request is already parsed.")
 var ERROR_UNKNOWN_STATE = fmt.Errorf("Unknown request state.")
-var ERROR_EOF_B4_END = fmt.Errorf("Got io.EOF with unparsable data in buffer.")
+var ERROR_EOF_B4_END = fmt.Errorf("Incomplete request or got io.EOF (conn closed) with unparsable data still in buffer.")
 
 type parsedState int
 
@@ -96,7 +96,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		if err != nil {
 			// check if its EOF
 			if errors.Is(err, io.EOF) {
-				req.State = StateDone
+				if req.State != StateDone {
+					return nil, ERROR_EOF_B4_END
+				}
 				break
 			}
 			return nil, err
