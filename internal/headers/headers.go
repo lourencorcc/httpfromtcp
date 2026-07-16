@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 type Headers map[string]string
@@ -17,6 +18,7 @@ const (
 var BUF_SIZE = 8
 var ERROR_INVALID_HEADER_SPACES = fmt.Errorf("field-name must not have spaces before or after.")
 var ERROR_INCOMPLETE_HEADER_LINE = fmt.Errorf("header line incomplete, missing crlf.")
+var ERROR_INVALID_CHAR = fmt.Errorf("field name must contain only: A-Z, a-z, 0-9 and special chars: !, #, $, %%, &, ', *, +, -, ., ^, _, `, |, ~")
 
 // var ERROR_INVALID_HEADER_FORMAT = fmt.Errorf("incorrect header format: should be:\n\t'field-name: field-value\\r\\n\\r\\n'\n")
 
@@ -49,7 +51,58 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	fieldValue := strings.TrimSpace(parts[1])
-	h[parts[0]] = fieldValue
+
+	err = isHeaderValid(parts[0])
+	if err != nil {
+		return 0, true, err
+	}
+
+	h[strings.ToLower(parts[0])] = fieldValue
 
 	return n, false, nil
+}
+
+// Don't touch helpers
+
+func isHeaderValid(header string) error {
+	// nil if header only contians aA-zZ, 0-9, special allowed
+	for _, ch := range header {
+		if isAlphaNum(ch) {
+			continue
+		} else if isSpecialAllowed(ch) {
+			continue
+		}
+		return ERROR_INVALID_CHAR
+
+	}
+	return nil
+}
+
+func isAlphaNum(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+func isSpecialAllowed(ch rune) bool {
+	var allowed = map[rune]struct{}{
+		'!':  {},
+		'#':  {},
+		'$':  {},
+		'%':  {},
+		'&':  {},
+		'\'': {},
+		'*':  {},
+		'+':  {},
+		'-':  {},
+		'.':  {},
+		'^':  {},
+		'_':  {},
+		'`':  {},
+		'|':  {},
+		'~':  {},
+	}
+	if _, ok := allowed[ch]; !ok {
+		return false
+	}
+	return true
+
 }

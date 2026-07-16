@@ -14,7 +14,7 @@ func TestHeadersLineParse(t *testing.T) {
 	n, done, err := headers.Parse(data)
 	require.NoError(t, err)
 	require.NotNil(t, headers)
-	assert.Equal(t, "localhost:42069", headers["Host"])
+	assert.Equal(t, "localhost:42069", headers["host"])
 	assert.Equal(t, 23, n) // includes the first crlf
 	assert.False(t, done)
 
@@ -31,7 +31,7 @@ func TestHeadersLineParse(t *testing.T) {
 	data = []byte("Host:      localhost:42069       \r\n\r\n")
 	n, done, err = headers.Parse(data)
 	assert.NoError(t, err)
-	assert.Equal(t, "localhost:42069", headers["Host"])
+	assert.Equal(t, "localhost:42069", headers["host"])
 	assert.Equal(t, 35, n) // shoudl it include all whitespace too?
 	assert.False(t, done)
 
@@ -45,8 +45,19 @@ func TestHeadersLineParse(t *testing.T) {
 	headers = NewHeaders()
 	data = []byte("Heady: Youngest Header\r\n\r\n")
 	n, done, err = headers.Parse(data)
-	assert.Equal(t, "Youngest Header", headers["Heady"])
+	assert.Equal(t, "Youngest Header", headers["heady"])
 
+	// Test: field-name resolves to lower case after parsing
+	headers = NewHeaders()
+	data = []byte("HEADER: BIG Header\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	assert.Equal(t, "BIG Header", headers["header"])
+
+	// Test: Invalid caracter in header (RFC 9110 - 5.6.2)
+	headers = NewHeaders()
+	data = []byte("F©reheader: its big\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	assert.EqualError(t, err, "field name must contain only: A-Z, a-z, 0-9 and special chars: !, #, $, %, &, ', *, +, -, ., ^, _, `, |, ~")
 }
 
 func TestHeadersParseFromBoot(t *testing.T) {
@@ -56,7 +67,7 @@ func TestHeadersParseFromBoot(t *testing.T) {
 	n, done, err := headers.Parse(data)
 	require.NoError(t, err)
 	require.NotNil(t, headers)
-	assert.Equal(t, "localhost:42069", headers["Host"])
+	assert.Equal(t, "localhost:42069", headers["host"])
 	assert.Equal(t, 23, n)
 	assert.False(t, done)
 
@@ -66,7 +77,7 @@ func TestHeadersParseFromBoot(t *testing.T) {
 	n, done, err = headers.Parse(data)
 	require.NoError(t, err)
 	require.NotNil(t, headers)
-	assert.Equal(t, "localhost:42069", headers["Host"])
+	assert.Equal(t, "localhost:42069", headers["host"])
 	assert.Equal(t, 30, n)
 	assert.False(t, done)
 
@@ -77,7 +88,7 @@ func TestHeadersParseFromBoot(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, headers)
 	assert.Equal(t, "localhost:42069", headers["host"])
-	assert.Equal(t, "curl/7.81.0", headers["User-Agent"])
+	assert.Equal(t, "curl/7.81.0", headers["user-agent"])
 	assert.Equal(t, 25, n)
 	assert.False(t, done)
 
