@@ -58,6 +58,14 @@ func TestHeadersLineParse(t *testing.T) {
 	data = []byte("F©reheader: its big\r\n\r\n")
 	n, done, err = headers.Parse(data)
 	assert.EqualError(t, err, "field name must contain only: A-Z, a-z, 0-9 and special chars: !, #, $, %, &, ', *, +, -, ., ^, _, `, |, ~")
+
+	// Test: Multiple field-values for same field-name
+	headers = NewHeaders()
+	headers["existing"] = "Early bird"
+	data = []byte("Existing: I think therefore\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	assert.Equal(t, "Early bird, I think therefore", headers["existing"])
+
 }
 
 func TestHeadersParseFromBoot(t *testing.T) {

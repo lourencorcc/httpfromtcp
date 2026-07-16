@@ -30,10 +30,10 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	idxSep := bytes.Index(data, []byte("\r\n"))
 
 	if idxSep == -1 {
-		// Can't find the \r\n
+		// Can't find the \r\n, incomplete data
 		return 0, false, nil
 	}
-	if idxSep == 0 {
+	if idxSep == 0 { // rn in the beggining so whatever was parsed until now, are the headers
 		return 2, true, nil
 	}
 
@@ -57,7 +57,12 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, true, err
 	}
 
-	h[strings.ToLower(parts[0])] = fieldValue
+	key := strings.ToLower(parts[0])
+	if existing, ok := h[key]; ok {
+		h[key] = existing + ", " + fieldValue
+	} else {
+		h[key] = fieldValue
+	}
 
 	return n, false, nil
 }
