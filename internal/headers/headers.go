@@ -19,6 +19,7 @@ var BUF_SIZE = 8
 var ERROR_INVALID_HEADER_SPACES = fmt.Errorf("field-name must not have spaces before or after.")
 var ERROR_INCOMPLETE_HEADER_LINE = fmt.Errorf("header line incomplete, missing crlf.")
 var ERROR_INVALID_CHAR = fmt.Errorf("field name must contain only: A-Z, a-z, 0-9 and special chars: !, #, $, %%, &, ', *, +, -, ., ^, _, `, |, ~")
+var ERROR_HEADER_NOT_FOUND = fmt.Errorf("header not found")
 
 // var ERROR_INVALID_HEADER_FORMAT = fmt.Errorf("incorrect header format: should be:\n\t'field-name: field-value\\r\\n\\r\\n'\n")
 
@@ -65,6 +66,14 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	return n, false, nil
+}
+
+func (h Headers) Get(key string) (string, error) {
+	if v, ok := h[strings.ToLower(key)]; !ok {
+		return v, ERROR_HEADER_NOT_FOUND
+	} else {
+		return v, nil
+	}
 }
 
 // Don't touch helpers

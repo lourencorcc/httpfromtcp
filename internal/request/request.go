@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"httpgo/internal/headers"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,7 @@ var ERROR_MALFORMED_REQUEST = fmt.Errorf("invalid number of parts in the request
 var ERROR_PARSED_REQUEST = fmt.Errorf("the request is already parsed.")
 var ERROR_UNKNOWN_STATE = fmt.Errorf("Unknown request state.")
 var ERROR_EOF_B4_END = fmt.Errorf("Incomplete request or got io.EOF (conn closed) with unparsable data still in buffer.")
+var ERROR_BODY_LENGTH_MISMATCH = fmt.Errorf("body is bigger than the claimed content-length")
 
 type parsedState int
 
@@ -24,12 +26,15 @@ const (
 	StateInit parsedState = iota
 	StateDone
 	StateParsingHeaders
+	StateParsingBody
 )
 
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 	State       parsedState // should be private?
+
 }
 
 type RequestLine struct {
@@ -82,11 +87,30 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return n, fmt.Errorf("error while parsing headers: %w", err)
 		}
 		if done {
-			r.State = StateDone
+			r.State = StateParsingBody
 		}
 
 		return n, nil
+	case StateParsingBody:
+		v, err := r.Headers.Get("Content-Length")
+		if err != nil {
+			r.State = StateDone // no header, no body
+			return 0, nil
+		}
 
+		contentLength, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, err
+		}
+
+		r.Body = append(r.Body, data...)
+		if len(r.Body) > contentLength {
+			return 0, ERROR_BODY_LENGTH_MISMATCH
+		} else if len(r.Body) == contentLength {
+			r.State = StateDone
+		}
+
+		return len(data), nil
 	case StateDone:
 		return 0, ERROR_PARSED_REQUEST
 
