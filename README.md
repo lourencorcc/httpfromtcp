@@ -19,4 +19,4 @@ Created this repo and project to get hands-on with Go and networks by reimplemen
 - AI was used for educational purposes and curiosity 
 
 ## Status
-- Currently working on adding the HTTP Header Parsing package to the main parser package 
+- Currently working on parsing the request's body 

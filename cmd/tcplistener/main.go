@@ -30,6 +30,10 @@ func main() {
 			log.Printf("error parsing request: %v\n", err)
 		} else {
 			fmt.Printf("Request line:\n- Method: %s\n- Target: %s\n- Version: %s\n", rl.RequestLine.Method, rl.RequestLine.RequestTarget, rl.RequestLine.HttpVersion)
+			fmt.Printf("Headers:\n")
+			for k, v := range rl.Headers {
+				fmt.Printf("- %s: %s\n", k, v)
+			}
 		}
 
 		fmt.Println("Connection to ", conn.RemoteAddr(), "closed")

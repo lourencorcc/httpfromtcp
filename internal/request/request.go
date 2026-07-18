@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"httpgo/internal/headers"
 	"io"
 	"strings"
 )
@@ -22,11 +23,13 @@ type parsedState int
 const (
 	StateInit parsedState = iota
 	StateDone
+	StateParsingHeaders
 )
 
 type Request struct {
 	RequestLine RequestLine
-	State       parsedState
+	Headers     headers.Headers
+	State       parsedState // should be private?
 }
 
 type RequestLine struct {
@@ -37,31 +40,59 @@ type RequestLine struct {
 
 func newRequest() *Request {
 	return &Request{
-		State: StateInit,
+		State:   StateInit,
+		Headers: headers.NewHeaders(),
 	}
 }
 
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.State != StateDone {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return totalBytesParsed, err
+		}
+		totalBytesParsed += n
+		if n == 0 {
+			break
+		}
+	}
+
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.State {
 	case StateInit:
 		rl, n, err := parseRequestLine(data)
 		if err != nil {
-			return n, err
+			return n, fmt.Errorf("error while parsing request line: %w", err)
 		}
 		if n == 0 {
 			return 0, nil
 		}
 		r.RequestLine = *rl
-		r.State = StateDone
+		r.State = StateParsingHeaders // was StateDone
 
 		return n, nil
+
+	case StateParsingHeaders:
+		n, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return n, fmt.Errorf("error while parsing headers: %w", err)
+		}
+		if done {
+			r.State = StateDone
+		}
+
+		return n, nil
+
 	case StateDone:
 		return 0, ERROR_PARSED_REQUEST
 
 	default:
 		return 0, ERROR_UNKNOWN_STATE
 	}
-
 }
 
 func (rl RequestLine) isValid() error {

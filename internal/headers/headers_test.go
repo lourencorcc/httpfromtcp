@@ -39,7 +39,7 @@ func TestHeadersLineParse(t *testing.T) {
 	headers = NewHeaders()
 	data = []byte("Host : localhost:42069\r\n\r\n")
 	n, done, err = headers.Parse(data)
-	assert.EqualError(t, err, "field-name must not have spaces before or after.")
+	assert.ErrorIs(t, err, ERROR_INVALID_HEADER_SPACES)
 
 	// Test: space header value
 	headers = NewHeaders()
@@ -57,7 +57,7 @@ func TestHeadersLineParse(t *testing.T) {
 	headers = NewHeaders()
 	data = []byte("F©reheader: its big\r\n\r\n")
 	n, done, err = headers.Parse(data)
-	assert.EqualError(t, err, "field name must contain only: A-Z, a-z, 0-9 and special chars: !, #, $, %, &, ', *, +, -, ., ^, _, `, |, ~")
+	assert.ErrorIs(t, err, ERROR_INVALID_CHAR)
 
 	// Test: Multiple field-values for same field-name
 	headers = NewHeaders()
