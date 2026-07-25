@@ -2,11 +2,10 @@ package server
 
 import (
 	"fmt"
-	"io"
+	"httpgo/internal/response"
 	"log"
 	"net"
 	"strconv"
-	"strings"
 	"sync/atomic"
 )
 
@@ -74,9 +73,10 @@ func (s *Server) Close() {
 func (s *Server) handle(conn net.Conn) {
 	// Shut down the connection.
 	defer conn.Close()
-
-	n, _ := io.Copy(conn, strings.NewReader("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello World!\n"))
+	response.WriteStatusLine(conn, response.Ok)
+	response.WriteHeaders(conn, response.GetDefaultHeaders(0))
+	// n, _ := io.Copy(conn, strings.NewReader("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello World!\n"))
 	// conn.Write([]byte(response)) another way of doing it
 
-	fmt.Printf("received %d bytes\n", n)
+	// fmt.Printf("received %d bytes\n", n)
 }
