@@ -1,11 +1,15 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"httpgo/internal/request"
 	"httpgo/internal/response"
+	"io"
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"sync/atomic"
 )
 
@@ -19,11 +23,41 @@ const (
 ) */
 
 type Server struct {
-	listener net.Listener
-	closed   atomic.Bool
+	listener    net.Listener
+	closed      atomic.Bool
+	handlerFunc Handler
 }
 
-func Serve(port int) (*Server, error) {
+type Handler func(w io.Writer, r *request.Request) *HandlerError
+
+type HandlerError struct {
+	StatusCode response.StatusCode
+	Msg        string
+}
+
+func (hErr *HandlerError) writeErr(w io.Writer) error {
+
+	headers := response.GetDefaultHeaders(len(hErr.Msg))
+
+	err := response.WriteStatusLine(w, hErr.StatusCode)
+	if err != nil {
+		return err
+	}
+
+	err = response.WriteHeaders(w, headers)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, strings.NewReader(hErr.Msg))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Serve(port int, handler Handler) (*Server, error) {
 	// creates a net.Listener and returns a new Server instance.
 	l, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
@@ -31,7 +65,8 @@ func Serve(port int) (*Server, error) {
 	}
 
 	server := &Server{
-		listener: l, // fine cz closed gets the 0 value because we mustn't copy an atomic bool
+		listener:    l, // fine cz closed gets the 0 value because we mustn't copy an atomic bool
+		handlerFunc: handler,
 	}
 
 	go server.listen()
@@ -59,7 +94,7 @@ func (s *Server) listen() {
 		// handle the connection in a new goroutine.
 		// the loop then returns to accepting, so that multiple connections may be served concurrently.
 		go func(c net.Conn) {
-			s.handle(c)
+			s.handle(c) // not sure what to do with the errors
 		}(conn)
 
 	}
@@ -70,13 +105,40 @@ func (s *Server) Close() {
 	s.listener.Close() // could be nil actually if the package is misused but I assume that won't happen
 }
 
-func (s *Server) handle(conn net.Conn) {
+func (s *Server) handle(conn net.Conn) error {
 	// Shut down the connection.
 	defer conn.Close()
-	response.WriteStatusLine(conn, response.Ok)
-	response.WriteHeaders(conn, response.GetDefaultHeaders(0))
-	// n, _ := io.Copy(conn, strings.NewReader("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello World!\n"))
-	// conn.Write([]byte(response)) another way of doing it
+	parsedRequest, err := request.RequestFromReader(conn)
+	if err != nil {
+		hErr := &HandlerError{
+			StatusCode: response.BadRequest,
+			Msg:        err.Error(),
+		}
+		hErr.writeErr(conn)
+		return err
+	}
 
-	// fmt.Printf("received %d bytes\n", n)
+	var b bytes.Buffer
+
+	hErr := s.handlerFunc(&b, parsedRequest)
+	if hErr.StatusCode != response.Ok {
+		hErr.writeErr(conn)
+		return nil
+	}
+
+	headers := response.GetDefaultHeaders(b.Len())
+
+	err = response.WriteStatusLine(conn, response.Ok)
+	if err != nil {
+		return err
+	}
+
+	response.WriteHeaders(conn, headers)
+	_, err = io.Copy(conn, &b) // TODO: vs conn.Write ? what is the diff
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
