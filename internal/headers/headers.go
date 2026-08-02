@@ -76,6 +76,15 @@ func (h Headers) Get(key string) (string, error) {
 	}
 }
 
+func (h Headers) Override(key string, value string) error {
+	if _, ok := h[strings.ToLower(key)]; !ok {
+		return ERROR_HEADER_NOT_FOUND
+	} else {
+		h[strings.ToLower(key)] = value
+		return nil
+	}
+}
+
 // Don't touch helpers
 
 func isHeaderValid(header string) error {

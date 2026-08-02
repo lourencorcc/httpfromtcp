@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"httpgo/internal/request"
 	"httpgo/internal/response"
@@ -28,7 +27,8 @@ type Server struct {
 	handlerFunc Handler
 }
 
-type Handler func(w io.Writer, r *request.Request) *HandlerError
+// type Handler func(w io.Writer, r *request.Request) *HandlerError
+type Handler func(w *response.Writer, req *request.Request)
 
 type HandlerError struct {
 	StatusCode response.StatusCode
@@ -87,7 +87,7 @@ func (s *Server) listen() {
 			if s.closed.Load() {
 				log.Println(err)
 			} else {
-				log.Fatalf("unexpected error while listening: %w", err)
+				log.Fatalf("unexpected error while listening")
 			}
 			return
 		}
@@ -108,37 +108,22 @@ func (s *Server) Close() {
 func (s *Server) handle(conn net.Conn) error {
 	// Shut down the connection.
 	defer conn.Close()
+	w := &response.Writer{
+		NextWrite:    response.StatusLine,
+		ResponseType: "text/html",
+		Writer:       conn,
+	}
+
 	parsedRequest, err := request.RequestFromReader(conn)
 	if err != nil {
-		hErr := &HandlerError{
-			StatusCode: response.BadRequest,
-			Msg:        err.Error(),
-		}
-		hErr.writeErr(conn)
+		w.WriteStatusLine(response.BadRequest)
+		headers := response.GetDefaultHeaders(len(response.BadRequestHtmlMsg))
+		headers.Override("Content-Type", "text/html")
+		w.WriteHeaders(headers)
+		w.WriteBody([]byte(response.BadRequestHtmlMsg))
 		return err
 	}
 
-	var b bytes.Buffer
-
-	hErr := s.handlerFunc(&b, parsedRequest)
-	if hErr.StatusCode != response.Ok {
-		hErr.writeErr(conn)
-		return nil
-	}
-
-	headers := response.GetDefaultHeaders(b.Len())
-
-	err = response.WriteStatusLine(conn, response.Ok)
-	if err != nil {
-		return err
-	}
-
-	response.WriteHeaders(conn, headers)
-	_, err = io.Copy(conn, &b) // TODO: vs conn.Write ? what is the diff
-	if err != nil {
-		return err
-	}
-
+	s.handlerFunc(w, parsedRequest)
 	return nil
-
 }
