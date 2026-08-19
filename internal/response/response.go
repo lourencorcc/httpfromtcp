@@ -97,7 +97,7 @@ func (w *Writer) WriteHeaders(headers headers.Headers) error {
 		return fmt.Errorf("content-type header not found: %w", err)
 	}
 	if cType != w.ResponseType {
-		headers.Override("Content-Type", w.ResponseType)
+		headers.Set("Content-Type", w.ResponseType)
 	}
 	for h, v := range headers {
 		_, err := w.Writer.Write([]byte(h + ": " + v + "\r\n"))
@@ -123,4 +123,33 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 		return n, err
 	}
 	return n, nil // should i return new bytes or cur lenght?
+}
+
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+
+	_, err := w.WriteBody([]byte(fmt.Sprintf("%x\r\n", len(p)))) // can be optimized
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := w.WriteBody(p)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = w.WriteBody([]byte("\r\n"))
+	if err != nil {
+		return 0, err
+	}
+	fmt.Printf("responded with %d bytes chunked\n", n)
+
+	return n, nil
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	n, err := w.WriteBody([]byte("0\r\n\r\n"))
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
 }

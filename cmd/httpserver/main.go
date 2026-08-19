@@ -7,8 +7,11 @@ import (
 	"httpgo/internal/server"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -29,6 +32,11 @@ func main() {
 }
 
 func handleRequest(w *response.Writer, r *request.Request) {
+	if strings.HasPrefix(r.RequestLine.RequestTarget, "/httpbin/stream/") {
+		// Chunked encoding stuff
+		proxyChunked(w, r)
+		return
+	}
 
 	switch r.RequestLine.RequestTarget {
 	case "/yourproblem":
@@ -63,7 +71,6 @@ func handleRequest(w *response.Writer, r *request.Request) {
 			log.Fatal(err)
 		}
 		fmt.Printf("responded with %d bytes on /myproblem\n", n)
-
 	default:
 		err := w.WriteStatusLine(response.Ok)
 		if err != nil {
@@ -80,6 +87,64 @@ func handleRequest(w *response.Writer, r *request.Request) {
 			log.Fatal(err)
 		}
 		fmt.Printf("responded with %d bytes on %s\n", n, r.RequestLine.RequestTarget)
+	}
+}
+
+func proxyChunked(w *response.Writer, r *request.Request) {
+	arg, err := strconv.Atoi(strings.TrimPrefix(r.RequestLine.RequestTarget, "/httpbin/stream/"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.WriteStatusLine(response.Ok)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// headers
+	headers := response.GetDefaultHeaders(len(response.OkHtmlMsg))
+	err = headers.Override("Content-Length", "Transfer-Encoding", "chunked")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = w.WriteHeaders(headers)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// CHunked body
+	buf := make([]byte, 1024)
+	res, err := http.Get(fmt.Sprintf("https://httpbingo.org/stream/%d", arg))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var errRead error
+	var nRead int
+	defer res.Body.Close()
+	for errRead != io.EOF {
+		nRead, errRead = res.Body.Read(buf)
+		if errRead != nil {
+			if errRead != io.EOF {
+				log.Fatal(errRead)
+			}
+		}
+		if nRead > 0 {
+			fmt.Printf("Got %d bytes in response from httpbin\n", nRead)
+			n, err := w.WriteChunkedBody(buf[:nRead])
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Forwarded %d chunked bytes\n", n) // should be +2 due to rn
+		}
+		if errRead == io.EOF {
+			break
+		}
+	}
+
+	_, err = w.WriteChunkedBodyDone()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 

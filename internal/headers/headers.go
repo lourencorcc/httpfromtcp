@@ -76,11 +76,21 @@ func (h Headers) Get(key string) (string, error) {
 	}
 }
 
-func (h Headers) Override(key string, value string) error {
+func (h Headers) Set(key string, value string) error {
 	if _, ok := h[strings.ToLower(key)]; !ok {
 		return ERROR_HEADER_NOT_FOUND
 	} else {
 		h[strings.ToLower(key)] = value
+		return nil
+	}
+}
+
+func (h Headers) Override(oldKey string, newKey string, value string) error {
+	if _, ok := h[strings.ToLower(oldKey)]; !ok {
+		return ERROR_HEADER_NOT_FOUND
+	} else {
+		delete(h, strings.ToLower(oldKey))
+		h[strings.ToLower(newKey)] = value
 		return nil
 	}
 }

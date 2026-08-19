@@ -118,7 +118,7 @@ func (s *Server) handle(conn net.Conn) error {
 	if err != nil {
 		w.WriteStatusLine(response.BadRequest)
 		headers := response.GetDefaultHeaders(len(response.BadRequestHtmlMsg))
-		headers.Override("Content-Type", "text/html")
+		headers.Set("Content-Type", "text/html")
 		w.WriteHeaders(headers)
 		w.WriteBody([]byte(response.BadRequestHtmlMsg))
 		return err
