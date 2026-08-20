@@ -95,6 +95,11 @@ func (h Headers) Override(oldKey string, newKey string, value string) error {
 	}
 }
 
+func (h Headers) Add(key string, value string) error {
+	h[key] = value
+	return nil
+}
+
 // Don't touch helpers
 
 func isHeaderValid(header string) error {

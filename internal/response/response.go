@@ -153,3 +153,26 @@ func (w *Writer) WriteChunkedBodyDone() (int, error) {
 	}
 	return n, nil
 }
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	if w.NextWrite != Body { // was not writing the body
+		return ERR_INVALID_WRITE_ORDER
+	}
+
+	_, err := w.WriteBody([]byte("0\r\n"))
+	if err != nil {
+		return err
+	}
+
+	for t, v := range h {
+		_, err := w.Writer.Write([]byte(t + ": " + v + "\r\n"))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = w.Writer.Write([]byte("\r\n"))
+	if err != nil {
+		return err
+	}
+	return nil
+}

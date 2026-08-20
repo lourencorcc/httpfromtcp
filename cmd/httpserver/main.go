@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"httpgo/internal/headers"
 	"httpgo/internal/request"
 	"httpgo/internal/response"
 	"httpgo/internal/server"
@@ -33,8 +36,13 @@ func main() {
 
 func handleRequest(w *response.Writer, r *request.Request) {
 	if strings.HasPrefix(r.RequestLine.RequestTarget, "/httpbin/stream/") {
-		// Chunked encoding stuff
+		// Chunked encoding
 		proxyChunked(w, r)
+		return
+	}
+	if strings.HasPrefix(r.RequestLine.RequestTarget, "/httpbin/range/") {
+		// Trailer headers
+		proxyTrailers(w, r)
 		return
 	}
 
@@ -146,6 +154,77 @@ func proxyChunked(w *response.Writer, r *request.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func proxyTrailers(w *response.Writer, r *request.Request) {
+	arg, err := strconv.Atoi(strings.TrimPrefix(r.RequestLine.RequestTarget, "/httpbin/range/"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.WriteStatusLine(response.Ok)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// headers
+	myHeaders := response.GetDefaultHeaders(len(response.OkHtmlMsg))
+	err = myHeaders.Override("Content-Length", "Transfer-Encoding", "chunked")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	myHeaders.Add("Trailer", "X-Content-SHA256, X-Content-Length")
+
+	err = w.WriteHeaders(myHeaders)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	hasher := sha256.New()
+	// CHunked body
+	buf := make([]byte, 1024)
+	res, err := http.Get(fmt.Sprintf("https://httpbingo.org/range/%d", arg))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var errRead error
+	var nRead int
+	var totalRead int
+	defer res.Body.Close()
+	for errRead != io.EOF {
+		nRead, errRead = res.Body.Read(buf)
+		if errRead != nil {
+			if errRead != io.EOF {
+				log.Fatal(errRead)
+			}
+		}
+		if nRead > 0 {
+			fmt.Printf("Got %d bytes in response from httpbin\n", nRead)
+			hasher.Write(buf[:nRead])
+			totalRead += nRead
+			n, err := w.WriteChunkedBody(buf[:nRead])
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Forwarded %d chunked bytes\n", n) // should be +2 due to rn
+		}
+		if errRead == io.EOF {
+			break
+		}
+	}
+	hash := hasher.Sum(nil)
+	fmt.Println(hash)
+	trailers := headers.NewHeaders()
+	trailers.Add("X-Content-SHA256", hex.EncodeToString(hash))
+	trailers.Add("X-Content-Length", strconv.Itoa(totalRead))
+
+	err = w.WriteTrailers(trailers)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 func handleRequestOld(w io.Writer, r *request.Request) *server.HandlerError {
