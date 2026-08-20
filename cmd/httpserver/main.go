@@ -79,6 +79,33 @@ func handleRequest(w *response.Writer, r *request.Request) {
 			log.Fatal(err)
 		}
 		fmt.Printf("responded with %d bytes on /myproblem\n", n)
+	case "/video":
+		err := w.WriteStatusLine(response.Ok)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fi, err := os.Stat("/home/lou/Projects/httpfromtcp/assets/vim.mp4")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defHeaders := response.GetDefaultHeaders(int(fi.Size()))
+		defHeaders.Set("Content-Type", "video/mp4")
+		err = w.WriteHeaders(defHeaders)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		data, err := os.ReadFile("/home/lou/Projects/httpfromtcp/assets/vim.mp4")
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, err = w.WriteBody(data)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("responded with a %d size video\n", int(fi.Size()))
+
 	default:
 		err := w.WriteStatusLine(response.Ok)
 		if err != nil {
