@@ -95,7 +95,7 @@ func (h Headers) Override(oldKey string, newKey string, value string) error {
 	}
 }
 
-func (h Headers) Add(key string, value string) error {
+func (h Headers) Add(key string, value string) error { // case sensitive to pass tests
 	h[key] = value
 	return nil
 }

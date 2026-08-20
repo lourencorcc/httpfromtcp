@@ -90,10 +90,10 @@ func handleRequest(w *response.Writer, r *request.Request) {
 		}
 
 		defHeaders := response.GetDefaultHeaders(int(fi.Size()))
-		defHeaders.Set("Content-Type", "video/mp4")
+		w.ResponseType = "video/mp4"
 		err = w.WriteHeaders(defHeaders)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Printf("unimportant error writing errors: %e", err)
 		}
 
 		data, err := os.ReadFile("/home/lou/Projects/httpfromtcp/assets/vim.mp4")
